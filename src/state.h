@@ -8,10 +8,6 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the Licen static Scope kBuiltinScope;
-
-  static Pool kDefaultPool;
-  static Pool kConsolePool;
-  static Rule kPhonyRule;se is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -26,10 +22,10 @@
 #include <vector>
 using namespace std;
 
+#include "concurrent_hash_map.h"
 #include "eval_env.h"
 #include "graph.h"
 #include "string_piece.h"
-#include "concurrent_hash_map.h"
 #include "util.h"
 
 struct Edge;
@@ -89,15 +85,17 @@ struct Pool {
     size_t depth_diag_pos = 0;
   } parse_state_;
 
-private:
+ private:
   /// |current_use_| is the total of the weights of the edges which are
   /// currently scheduled in the Plan (i.e. the edges in Plan::ready_).
   int current_use_ = 0;
 
   struct WeightedEdgeCmp {
     bool operator()(const Edge* a, const Edge* b) const {
-      if (!a) return b;
-      if (!b) return false;
+      if (!a)
+        return b;
+      if (!b)
+        return false;
       int weight_diff = a->weight() - b->weight();
       return ((weight_diff < 0) || (weight_diff == 0 && EdgeCmp()(a, b)));
     }
@@ -111,7 +109,10 @@ private:
 struct State {
   /// The built-in pools and rules use this dummy built-in scope to initialize
   /// their RelativePosition fields. The scope won't have anything in it.
- 
+  static Scope kBuiltinScope;
+  static Pool kDefaultPool;
+  static Pool kConsolePool;
+  static Rule kPhonyRule;
 
   State();
 
@@ -158,8 +159,8 @@ struct State {
 
   /// Mapping of path -> Node.
   ///
-  /// This hash map uses a value type of Node* rather than Node, which allows the
-  /// map entry's key (a string view) to refer to the Node::name field.
+  /// This hash map uses a value type of Node* rather than Node, which allows
+  /// the map entry's key (a string view) to refer to the Node::name field.
   typedef ConcurrentHashMap<HashedStrView, Node*> Paths;
   Paths paths_;
 
@@ -169,10 +170,10 @@ struct State {
   /// All the edges of the graph.
   vector<Edge*> edges_;
 
-  Scope root_scope_ { ScopePosition {} };
+  Scope root_scope_{ ScopePosition{} };
   vector<Node*> defaults_;
 
-private:
+ private:
   /// Position 0 is used for built-in decls (e.g. pools).
   DeclIndex dfs_location_ = 1;
 };
