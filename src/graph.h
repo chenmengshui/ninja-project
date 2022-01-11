@@ -214,6 +214,10 @@ struct Node {
   bool InputsChecked() const { return inputs_checked_; }
   void MarkInputsChecked() { inputs_checked_ = true; }
 
+   // Used in the ToolAllOutputs.
+  bool OutputsChecked() const { return outputs_checked_; }   
+  void MarkOutputsChecked() { outputs_checked_ = true; }
+
 private:
   const HashedStr path_;
 
@@ -264,6 +268,8 @@ private:
   /// Stores if this node's inputs have been already computed. Used in the
   /// inputs debug tool.
   bool inputs_checked_ = false;
+  //// Used in the ToolAllOutputs.
+  bool outputs_checked_ = false; 
 };
 
 // A dependency path, where each node is an input of the next node.

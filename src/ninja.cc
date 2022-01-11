@@ -1060,7 +1060,7 @@ int NinjaMain::ToolOutputs(const Options* options, int argc, char* argv[]) {
       return 1;
     }
     // target存在，获取并遍历所有out_edges_，输出out_edges_->outputs
-    printf("target %s: output files\n", target->path().c_str());
+    printf("target %s: output files:\n", target->path().c_str());
     const std::vector<Edge*> out_edges = target->GetOutEdges();
     for (vector<Edge*>::const_iterator edge = out_edges.begin();
          edge != out_edges.end(); ++edge) {
@@ -1071,6 +1071,27 @@ int NinjaMain::ToolOutputs(const Options* options, int argc, char* argv[]) {
     }
   }
   return 0;
+}
+
+void ToolOutputsProcessNode(Node* node) {
+  // 检查是否已访问
+  if (node->OutputsChecked())
+    return;
+  node->MarkOutputsChecked();
+  printf(" %s\n", node->path().c_str());
+
+  // 递归访问node的out_edges，输出out_edges_->outputs
+  // if (!node->has_out_edge()) {
+  //   printf(" %s\n", node->path().c_str());
+  // }
+  const std::vector<Edge*> out_edges = node->GetOutEdges();
+  for (vector<Edge*>::const_iterator edge = out_edges.begin();
+       edge != out_edges.end(); ++edge) {
+    for (vector<Node*>::iterator output = (*edge)->outputs_.begin();
+         output != (*edge)->outputs_.end(); ++output) {
+      ToolOutputsProcessNode(*output);
+    }
+  }
 }
 
 // 递归获得所有out_edge_和output
@@ -1091,7 +1112,8 @@ int NinjaMain::ToolAllOutputs(const Options* options, int argc, char* argv[]) {
       return 1;
     }
     // target存在，调用递归函数
-
+    printf("target %s: all output files: \n", target->path().c_str());
+    ToolOutputsProcessNode(target);
   }
 
   return 0;
@@ -1175,7 +1197,8 @@ bool DebugEnable(const string& name) {
         "  keepdepfile  don't delete depfiles after they're read by ninja\n"
         "  keeprsp      don't delete @response files on success\n"
 #ifdef _WIN32
-        "  nostatcache  don't batch stat() calls per directory and cache them\n"
+        "  nostatcache  don't batch stat() calls per directory and cache "
+        "them\n"
 #endif
         "  nothreads    don't use threads to parallelize ninja\n"
         "multiple modes can be enabled via -d FOO -d BAR\n");
@@ -1316,7 +1339,8 @@ bool OptionEnable(const string& name, Options* options, BuildConfig* config) {
         "'symlink_outputs' so \n"
         "                             that these warnings work:\n"
         "                                undeclaredsymlinkoutputs\n"
-        "  preremoveoutputs={yes,no}  whether to remove outputs before running "
+        "  preremoveoutputs={yes,no}  whether to remove outputs before "
+        "running "
         "rule\n");
     return false;
   } else if (name == "usesphonyoutputs=yes") {
