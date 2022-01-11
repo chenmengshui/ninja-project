@@ -1073,10 +1073,6 @@ int NinjaMain::ToolOutputs(const Options* options, int argc, char* argv[]) {
   return 0;
 }
 
-void ToolOutputsProcessNode(Node* node,){
-
-}
-
 // 递归获得所有out_edge_和output
 int NinjaMain::ToolAllOutputs(const Options* options, int argc, char* argv[]) {
   // 无targets
@@ -1095,7 +1091,6 @@ int NinjaMain::ToolAllOutputs(const Options* options, int argc, char* argv[]) {
       return 1;
     }
     // target存在，调用递归函数
-    Tool
 
   }
 
