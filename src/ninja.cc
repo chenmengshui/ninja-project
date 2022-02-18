@@ -147,6 +147,7 @@ struct NinjaMain : public BuildLogUser {
   int ToolUrtle(const Options* options, int argc, char** argv);
   int ToolOutputs(const Options* options, int argc, char* argv[]);
   int ToolAllOutputs(const Options* options, int argc, char* argv[]);
+  int ToolRelates(const Options* options, int argc, char* argv[]);
 
   /// Open the build log.
   /// @return false on error.
@@ -1119,6 +1120,66 @@ int NinjaMain::ToolAllOutputs(const Options* options, int argc, char* argv[]) {
   return 0;
 }
 
+void ToolRelatesProcessNode(Node* node, DepsLog deps_log_) {
+  // 检查是否已访问
+  if (node->OutputsChecked())
+    return;
+  node->MarkOutputsChecked();
+  printf(" %s\n", node->path().c_str());
+
+  //获取input结点
+  if (!node->InputsChecked()) {
+    bool leaf_only = true;
+    bool include_deps = true;
+    printf("{\n");
+    node->MarkInputsChecked();
+    if (Edge* edge = node->in_edge(); edge != nullptr) {
+      for (Node* input : edge->inputs_) {
+        ToolInputsProcessNode(input, &deps_log_, leaf_only, include_deps);
+      }
+      if (include_deps && edge->outputs_.size() > 0) {
+        ToolInputsProcessNodeDeps(edge->outputs_[0], &deps_log_, leaf_only,
+                                  include_deps);
+      }
+    }
+    printf("}\n");
+  }
+
+  // 递归获得所有的output
+  const std::vector<Edge*> out_edges = node->GetOutEdges();
+  for (vector<Edge*>::const_iterator edge = out_edges.begin();
+       edge != out_edges.end(); ++edge) {
+    for (vector<Node*>::iterator output = (*edge)->outputs_.begin();
+         output != (*edge)->outputs_.end(); ++output) {
+      ToolRelatesProcessNode(*output, deps_log_);
+    }
+  }
+}
+
+int NinjaMain::ToolRelates(const Options* options, int argc, char* argv[]) {
+  // 无targets
+  if (argc == 0) {
+    Error("expected at lease one target file");
+    return 1;
+  }
+
+  // 遍历targets
+  for (int i = 0; i < argc; ++i) {
+    string err;  // 根据command中的路径创建target
+    Node* target = CollectTarget(argv[i], &err);
+    // target不存在
+    if (!target) {
+      Error("%s", err.c_str());
+      return 1;
+    }
+    // target存在，调用递归函数
+    printf("target %s: all related files: \n", target->path().c_str());
+    ToolRelatesProcessNode(target,deps_log_);
+  }
+
+  return 0;
+}
+
 /// Find the function to execute for \a tool_name and return it via \a func.
 /// Returns a Tool, or NULL if Ninja should exit.
 const Tool* ChooseTool(const string& tool_name) {
@@ -1156,6 +1217,8 @@ const Tool* ChooseTool(const string& tool_name) {
       &NinjaMain::ToolOutputs },
     { "allOutputs", "show all affected outputs with a target",
       Tool::RUN_AFTER_LOAD, &NinjaMain::ToolAllOutputs },
+    { "relates", "show all related file to a target", Tool::RUN_AFTER_LOAD,
+      &NinjaMain::ToolRelates },
     { NULL, NULL, Tool::RUN_AFTER_FLAGS, NULL }
   };
 
