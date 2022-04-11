@@ -218,6 +218,10 @@ struct Node {
   bool OutputsChecked() const { return outputs_checked_; }   
   void MarkOutputsChecked() { outputs_checked_ = true; }
 
+  // Used in ToolSelectNodes.
+  bool IsVisited() const{return is_visited_;}
+  void MarkIsVisited() {is_visited_ = true;}
+
 private:
   const HashedStr path_;
 
@@ -269,7 +273,9 @@ private:
   /// inputs debug tool.
   bool inputs_checked_ = false;
   //// Used in the ToolAllOutputs.
-  bool outputs_checked_ = false; 
+  bool outputs_checked_ = false;
+  // Whether the node has been visited. Used in ToolSelectNoed
+  bool is_visited_ = false;
 };
 
 // A dependency path, where each node is an input of the next node.
@@ -467,6 +473,12 @@ public:
   }
 
   int validation_deps_ = 0;
+
+  // Whether the node has been visited. Used in ToolSelectNoed
+  bool is_visited_ = false;
+  // Used in ToolSelectNodes.
+  bool IsVisited() const { return is_visited_; }
+  void MarkIsVisited() { is_visited_ = true; }
 
   bool is_phony() const;
   bool use_console() const;

@@ -148,6 +148,7 @@ struct NinjaMain : public BuildLogUser {
   int ToolOutputs(const Options* options, int argc, char* argv[]);
   int ToolAllOutputs(const Options* options, int argc, char* argv[]);
   int ToolRelates(const Options* options, int argc, char* argv[]);
+  int ToolSourceFiles(const Options* options, int argc, char* argv[]);
 
   /// Open the build log.
   /// @return false on error.
@@ -1174,10 +1175,119 @@ int NinjaMain::ToolRelates(const Options* options, int argc, char* argv[]) {
     }
     // target存在，调用递归函数
     printf("target %s: all related files: \n", target->path().c_str());
-    ToolRelatesProcessNode(target,deps_log_);
+    ToolRelatesProcessNode(target, deps_log_);
   }
 
   return 0;
+}
+
+void ToolSelectNodesInputsDeps(Node* node, DepsLog* deps_log, bool leaf_only,
+                               bool include_deps) {
+  if (deps_log->IsDepsEntryLiveFor(node)) {
+    if (DepsLog::Deps* deps = deps_log->GetDeps(node); deps != nullptr) {
+      for (int i = 0; i < deps->node_count; ++i) {
+        if (Node* dep = deps->nodes[i]; dep != nullptr) {
+          ToolSelectNodesInputs(dep, deps_log, leaf_only, include_deps);
+        }
+      }
+    }
+  }
+}
+
+void ToolSelectNodesInputs(Node* input, DepsLog* deps_log, bool leaf_only,
+                           bool include_deps) {
+  if (input->InputsChecked())
+    return;
+  input->MarkInputsChecked();
+  Edge* input_edge = input->in_edge();
+  if (input_edge == nullptr || !leaf_only) {
+    printf("\t\t%s,\n", input->path().c_str());
+  }
+  if (input_edge) {
+    for (Node* input : input_edge->inputs_) {
+      ToolSelectNodesInputs(input, deps_log, leaf_only, include_deps);
+    }
+    if (include_deps && input_edge->outputs_.size() > 0) {
+      ToolSelectNodesInputsDeps(input_edge->outputs_[0], deps_log, leaf_only,
+                                include_deps);
+    }
+  }
+}
+
+// 获取rootNode
+// 遍历node
+// 对符合条件的node，加入变量
+// 迭代node
+void ToolSelectNodes(Node* node, DepsLog deps_log_) {
+  bool leaf_only = true;
+  bool include_deps = false;
+
+  if (node->IsVisited())
+    return;
+  string pathstr = node->path();
+  replace(pathstr.begin(), pathstr.end(), '\\', '/');
+
+  // pathstr是否为jar，是则printf，并打印inputs
+  int len = pathstr.length();
+  if (pathstr.substr(len-4,len)==".jar") {
+    printf("\t\"%s\": [\n", pathstr);
+
+    // 打印inputs
+    if (Edge* edge = node->in_edge(); edge != nullptr) {
+      for (Node* input : edge->inputs_) {
+        ToolSelectNodesInputs(input, &deps_log_, leaf_only, include_deps);
+      }
+      if (include_deps && edge->outputs_.size() > 0) {
+        ToolSelectNodesInputsDeps(edge->outputs_[0], &deps_log_, leaf_only,
+                                  include_deps);
+      }
+    }
+    printf("\t\" \"],\n");
+  }
+  // 将isvisited标记为true
+  node->MarkIsVisited();
+
+  // Edge* edge = node->in_edge();
+  // // 叶节点返回
+  // if (!edge) {
+  //   return;
+  // }
+
+  // // visited_edges中包含edge就return -> Edge添加is_visited_ true就return
+  // if (edge->IsVisited())
+  //   return;
+  // edge->MarkIsVisited();
+  // if (edge->dyndep_ && edge->dyndep_->dyndep_pending()) {
+  //   std::string err;
+  //   if (!dyndep_loader_.LoadDyndeps(edge->dyndep_, &err)) {
+  //     Warning("%s\n", err.c_str());
+  //   }
+  // }
+
+  // // 遍历edge的inputs_
+  // for (vector<Node*>::iterator in = edge->inputs_.begin();
+  //      in != edge->inputs_.end(); ++in) {
+  //   ToolSelectNodes(*in, deps_log_);
+  // }
+
+}
+
+int NinjaMain::ToolSourceFiles(const Options* options, int argc, char* argv[]) {
+  int depth = 1;
+  string err;
+  vector<Node*> root_nodes = state_.RootNodes(&err);
+  if (err.empty()) {
+    printf("{");
+    // 遍历root_nodes
+    for (vector<Node*>::const_iterator n = root_nodes.begin();
+         n != root_nodes.end(); ++n) {
+      ToolSelectNodes(*n, deps_log_);
+    }
+    printf("\t\" \": [\n\t\" \"]\n}");
+  } else {
+    Error("%s", err.c_str());
+    return 1;
+  }
 }
 
 /// Find the function to execute for \a tool_name and return it via \a func.
@@ -1219,6 +1329,8 @@ const Tool* ChooseTool(const string& tool_name) {
       Tool::RUN_AFTER_LOAD, &NinjaMain::ToolAllOutputs },
     { "relates", "show all related file to a target", Tool::RUN_AFTER_LOAD,
       &NinjaMain::ToolRelates },
+    { "sourceFiles", "show all source files for targets", Tool::RUN_AFTER_LOGS,
+      &NinjaMain::ToolSourceFiles },
     { NULL, NULL, Tool::RUN_AFTER_FLAGS, NULL }
   };
 
